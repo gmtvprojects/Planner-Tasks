@@ -26,8 +26,8 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
   return (
     <main className="flex h-screen flex-col p-4">
       <header className="mb-4 flex items-center gap-4">
-        <Link href="/dashboard" className="text-sm underline">← Quadros</Link>
-        <h1 className="text-xl font-semibold">{board.name}</h1>
+        <Link href="/dashboard" className="link text-sm">← Quadros</Link>
+        <h1 className="text-2xl font-black">{board.name}</h1>
       </header>
       <Kanban
         boardId={board.id}

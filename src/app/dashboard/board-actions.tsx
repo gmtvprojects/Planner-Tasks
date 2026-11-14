@@ -9,7 +9,7 @@ export function BoardCardActions({ id, name, isOwner }: { id: string; name: stri
     <div className="mt-2 flex gap-3 text-sm">
       <button
         disabled={pending}
-        className="underline"
+        className="link"
         onClick={() => {
           const n = prompt("Novo nome do quadro", name)?.trim();
           if (n && n !== name) start(() => renameBoard(id, n));
@@ -20,7 +20,7 @@ export function BoardCardActions({ id, name, isOwner }: { id: string; name: stri
       {isOwner && (
         <button
           disabled={pending}
-          className="text-red-600 underline"
+          className="link-danger"
           onClick={() => {
             if (confirm(`Excluir o quadro "${name}" e todos os cartões?`)) start(() => deleteBoard(id));
           }}

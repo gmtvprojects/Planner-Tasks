@@ -236,13 +236,13 @@ export function Kanban({ boardId, initial }: { boardId: string; initial: ColumnT
               e.preventDefault();
               addColumn();
             }}
-            className="w-72 shrink-0 rounded bg-zinc-200/60 p-3 dark:bg-zinc-800/60"
+            className="w-72 shrink-0 panel p-3"
           >
             <input
               value={newCol}
               onChange={(e) => setNewCol(e.target.value)}
               placeholder="+ Nova aba"
-              className="w-full rounded border border-zinc-300 px-2 py-1 text-black"
+              className="field py-1"
             />
           </form>
         </div>
@@ -250,7 +250,7 @@ export function Kanban({ boardId, initial }: { boardId: string; initial: ColumnT
         <DragOverlay>
           {activeCard && <CardView card={activeCard} />}
           {activeColumn && (
-            <div className="w-72 rounded bg-zinc-200 p-3 font-medium text-black opacity-80">
+            <div className="panel w-72 border-brand p-3 font-bold opacity-90">
               {activeColumn.title}
             </div>
           )}
@@ -292,14 +292,14 @@ function Column({
     <div
       ref={setNodeRef}
       style={{ transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.4 : 1 }}
-      className="flex max-h-full w-72 shrink-0 flex-col rounded bg-zinc-200/60 p-3 dark:bg-zinc-800/60"
+      className="flex max-h-full w-72 shrink-0 flex-col panel p-3"
     >
       <div className="mb-2 flex items-center justify-between gap-2">
-        <h2 className="flex-1 cursor-grab font-medium" {...attributes} {...listeners}>
-          {column.title} <span className="text-sm text-zinc-500">{column.cards.length}</span>
+        <h2 className="flex-1 cursor-grab font-bold" {...attributes} {...listeners}>
+          {column.title} <span className="text-sm text-muted">{column.cards.length}</span>
         </h2>
         <button onClick={onRename} title="Renomear" className="text-sm">✎</button>
-        <button onClick={onDelete} title="Excluir" className="text-sm text-red-600">✕</button>
+        <button onClick={onDelete} title="Excluir" className="text-sm text-danger">✕</button>
       </div>
 
       <SortableContext items={column.cards.map((k) => cardId(k.id))} strategy={verticalListSortingStrategy}>
@@ -324,7 +324,7 @@ function Column({
           value={text}
           onChange={(e) => setText(e.target.value)}
           placeholder="+ Adicionar cartão"
-          className="w-full rounded border border-zinc-300 px-2 py-1 text-sm text-black"
+          className="field py-1 text-sm"
         />
       </form>
     </div>
@@ -333,9 +333,9 @@ function Column({
 
 function CardView({ card }: { card: CardT }) {
   return (
-    <div className="rounded border border-zinc-300 bg-white p-2 text-sm text-black shadow-sm">
+    <div className="rounded-md border border-line bg-surface-2 p-2 text-sm text-fg transition hover:border-brand">
       <p>{card.title}</p>
-      {card.description && <p className="mt-1 line-clamp-2 text-xs text-zinc-500">{card.description}</p>}
+      {card.description && <p className="mt-1 line-clamp-2 text-xs text-muted">{card.description}</p>}
     </div>
   );
 }
@@ -371,17 +371,17 @@ function CardModal({
 }) {
   const [title, setTitle] = useState(card.title);
   const [description, setDescription] = useState(card.description ?? "");
-  const field = "w-full rounded border border-zinc-300 px-3 py-2 text-black";
+  const field = "field";
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={onClose}>
       <form
         onClick={(e) => e.stopPropagation()}
         onSubmit={(e) => {
           e.preventDefault();
           if (title.trim()) onSave(card, title.trim(), description);
         }}
-        className="flex w-full max-w-md flex-col gap-3 rounded bg-white p-4 text-black"
+        className="flex w-full max-w-md flex-col gap-3 panel p-4"
       >
         <input value={title} onChange={(e) => setTitle(e.target.value)} className={field} autoFocus />
         <textarea
@@ -394,14 +394,14 @@ function CardModal({
         <div className="flex justify-between">
           <button
             type="button"
-            className="text-red-600 underline"
+            className="link-danger"
             onClick={() => confirm("Excluir este cartão?") && onDelete(card)}
           >
             Excluir
           </button>
           <div className="flex gap-3">
-            <button type="button" onClick={onClose} className="underline">Cancelar</button>
-            <button className="rounded bg-blue-600 px-4 py-1 text-white">Salvar</button>
+            <button type="button" onClick={onClose} className="link">Cancelar</button>
+            <button className="btn-primary py-1">Salvar</button>
           </div>
         </div>
       </form>
