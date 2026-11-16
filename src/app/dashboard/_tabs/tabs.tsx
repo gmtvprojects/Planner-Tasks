@@ -123,11 +123,6 @@ export async function ProjetosTab({ userId }: { userId: string }) {
         <h2 className="mb-3 text-lg font-extrabold">Novo projeto</h2>
         <form action={createProject} className="flex flex-col gap-2 sm:flex-row">
           <input name="name" required placeholder="Nome do projeto" className="field flex-1" />
-          <input
-            name="columns"
-            placeholder="Abas do quadro, separadas por vírgula (padrão: A fazer, Em andamento, Concluído)"
-            className="field flex-[2]"
-          />
           <button className="btn-primary">Criar</button>
         </form>
       </section>
