@@ -43,8 +43,11 @@ export default async function Page() {
         {memberships.length === 0 && <p className="text-muted">Nenhum quadro ainda.</p>}
         <ul className="grid gap-3 sm:grid-cols-2">
           {memberships.map(({ board, role }) => (
-            <li key={board.id} className="panel p-4 transition hover:border-brand">
-              <Link href={`/boards/${board.id}`} className="text-lg font-bold hover:text-brand">
+            <li key={board.id} className="panel relative p-4 transition hover:border-brand">
+              <Link
+                href={`/boards/${board.id}`}
+                className="text-lg font-bold after:absolute after:inset-0 after:content-[''] hover:text-brand"
+              >
                 {board.name}
               </Link>
               <p className="text-sm text-muted">{board._count.columns} abas</p>

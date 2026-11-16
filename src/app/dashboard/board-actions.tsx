@@ -6,7 +6,7 @@ import { deleteBoard, renameBoard } from "@/app/boards/actions";
 export function BoardCardActions({ id, name, isOwner }: { id: string; name: string; isOwner: boolean }) {
   const [pending, start] = useTransition();
   return (
-    <div className="mt-2 flex gap-3 text-sm">
+    <div className="relative z-10 mt-2 flex w-fit gap-3 text-sm">
       <button
         disabled={pending}
         className="link"
