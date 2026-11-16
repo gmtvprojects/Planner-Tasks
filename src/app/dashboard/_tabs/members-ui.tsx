@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { dialog } from "@/app/dialogs";
 import { addMember, removeMember, setMemberRole } from "@/app/dashboard/actions";
 
 export type MemberT = {
@@ -52,8 +53,14 @@ export function MembersList({
               <button
                 disabled={pending}
                 className="link-danger text-sm"
-                onClick={() => {
-                  if (confirm(`Remover ${m.name} do projeto?`)) start(() => removeMember(projectId, m.userId));
+                onClick={async () => {
+                  const ok = await dialog.confirm({
+                    title: "Remover membro",
+                    message: `${m.name} deixará de ter acesso a este projeto.`,
+                    confirmLabel: "Remover",
+                    danger: true,
+                  });
+                  if (ok) start(() => removeMember(projectId, m.userId));
                 }}
               >
                 Remover

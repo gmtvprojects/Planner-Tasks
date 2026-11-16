@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { dialog } from "@/app/dialogs";
 import { deleteCard, updateCard } from "@/app/dashboard/actions";
 import {
   addChecklistItem,
@@ -45,7 +46,7 @@ async function run<T>(p: Promise<T>): Promise<T | undefined> {
   try {
     return await p;
   } catch {
-    alert("Não foi possível salvar essa alteração.");
+    await dialog.alert({ title: "Não foi possível salvar", message: "Tente novamente em instantes." });
     return undefined;
   }
 }
@@ -85,8 +86,8 @@ export function CardModal({
   useEffect(() => {
     let alive = true;
     getCardDetail(card.id).then((x) => alive && setD(x)).catch(() => {
-      alert("Não foi possível carregar o cartão.");
       onClose();
+      dialog.alert({ title: "Não foi possível carregar o cartão" });
     });
     return () => {
       alive = false;
@@ -95,7 +96,9 @@ export function CardModal({
   }, [card.id]);
 
   useEffect(() => {
-    const h = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    const h = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && !document.querySelector('[role="dialog"]')) onClose();
+    };
     window.addEventListener("keydown", h);
     return () => window.removeEventListener("keydown", h);
   }, [onClose]);
@@ -124,7 +127,13 @@ export function CardModal({
     await applyLabels([...d.labelIds, l.id], [...d.projectLabels, l]);
   }
   async function removeLabel(id: string) {
-    if (!d || !confirm("Excluir esta etiqueta de todos os cartões do projeto?")) return;
+    if (!d) return;
+    const ok = await dialog.confirm({
+      title: "Excluir etiqueta",
+      message: "A etiqueta será removida de todos os cartões do projeto.",
+      danger: true,
+    });
+    if (!ok) return;
     await run(deleteLabel(id));
     const labels = d.projectLabels.filter((l) => l.id !== id);
     const ids = d.labelIds.filter((x) => x !== id);
@@ -145,8 +154,12 @@ export function CardModal({
     if (!d || projectId === d.projectId) return;
     const loses = d.labelIds.length > 0 || d.assigneeIds.length > 0;
     const target = d.projects.find((p) => p.id === projectId)?.name;
-    const msg = `Mover o cartão para "${target}"?${loses ? " As etiquetas serão removidas e só os responsáveis que são membros do novo projeto serão mantidos." : ""}`;
-    if (!confirm(msg)) return;
+    const ok = await dialog.confirm({
+      title: "Mover cartão",
+      message: `O cartão irá para a primeira aba de "${target}".${loses ? " As etiquetas serão removidas e só os responsáveis que são membros do novo projeto serão mantidos." : ""}`,
+      confirmLabel: "Mover",
+    });
+    if (!ok) return;
     if (await attempt(moveCardToProject(card.id, projectId))) onMovedOut();
   }
 
@@ -492,7 +505,12 @@ export function CardModal({
             <button
               className="link-danger text-sm"
               onClick={async () => {
-                if (!confirm("Excluir este cartão?")) return;
+                const ok = await dialog.confirm({
+                  title: "Excluir cartão",
+                  message: `"${card.title}" será excluído com checklist e comentários.`,
+                  danger: true,
+                });
+                if (!ok) return;
                 if (await attempt(deleteCard(card.id))) onDeleted();
               }}
             >

@@ -80,7 +80,7 @@ export default async function Page({
         {tab === "reunioes" && project && access && (
           <ReunioesTab projectId={project.id} canManage={access.canManage} userId={user.id} />
         )}
-        {tab === "projetos" && user.isAdmin && <ProjetosTab userId={user.id} />}
+        {tab === "projetos" && user.isAdmin && <ProjetosTab />}
       </section>
     </main>
   );

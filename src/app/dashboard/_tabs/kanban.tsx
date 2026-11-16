@@ -29,6 +29,7 @@ import {
   moveColumn,
   renameColumn,
 } from "@/app/dashboard/actions";
+import { dialog } from "@/app/dialogs";
 import { Avatar, CardModal, LabelChip, type CardT } from "./card-modal";
 
 type ColumnT = { id: string; title: string; position: number; cards: CardT[] };
@@ -51,7 +52,7 @@ async function persist<T>(p: Promise<T>) {
   try {
     return await p;
   } catch {
-    alert("Não foi possível salvar. A página será recarregada.");
+    await dialog.alert({ title: "Não foi possível salvar", message: "A página será recarregada." });
     window.location.reload();
     throw new Error("persist failed");
   }
@@ -177,17 +178,25 @@ export function Kanban({
   }
 
   async function renameCol(c: ColumnT) {
-    const name = prompt("Novo nome da aba", c.title)?.trim();
+    const name = await dialog.prompt({
+      title: "Renomear aba",
+      defaultValue: c.title,
+      confirmLabel: "Salvar",
+    });
     if (!name || name === c.title) return;
     setColumns((cs) => cs.map((x) => (x.id === c.id ? { ...x, title: name } : x)));
     await persist(renameColumn(c.id, name));
   }
 
   async function removeCol(c: ColumnT) {
-    const msg = c.cards.length
-      ? `Excluir a aba "${c.title}" e seus ${c.cards.length} cartões?`
-      : `Excluir a aba "${c.title}"?`;
-    if (!confirm(msg)) return;
+    const ok = await dialog.confirm({
+      title: "Excluir aba",
+      message: c.cards.length
+        ? `A aba "${c.title}" e seus ${c.cards.length} cartões serão excluídos. Esta ação não pode ser desfeita.`
+        : `A aba "${c.title}" será excluída.`,
+      danger: true,
+    });
+    if (!ok) return;
     setColumns((cs) => cs.filter((x) => x.id !== c.id));
     await persist(deleteColumn(c.id));
   }
@@ -291,7 +300,6 @@ function Column({
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: colId(column.id),
   });
-  const [text, setText] = useState("");
 
   return (
     <div
@@ -315,23 +323,24 @@ function Column({
         </div>
       </SortableContext>
 
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          const t = text.trim();
-          if (!t) return;
-          setText("");
-          onAddCard(t);
-        }}
-        className="mt-2"
-      >
-        <input
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          placeholder="+ Adicionar cartão"
-          className="field py-1 text-sm"
-        />
-      </form>
+      <div className="mt-3 flex justify-end">
+        <button
+          title="Adicionar cartão"
+          aria-label="Adicionar cartão"
+          className="flex size-8 items-center justify-center rounded-md border border-line text-lg font-bold leading-none text-muted transition hover:border-brand hover:bg-brand hover:text-brand-ink"
+          onClick={async () => {
+            const t = await dialog.prompt({
+              title: "Novo cartão",
+              message: `Aba: ${column.title}`,
+              placeholder: "Título do cartão",
+              confirmLabel: "Adicionar",
+            });
+            if (t) onAddCard(t);
+          }}
+        >
+          +
+        </button>
+      </div>
     </div>
   );
 }

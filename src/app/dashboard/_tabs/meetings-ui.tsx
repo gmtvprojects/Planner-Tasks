@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { dialog } from "@/app/dialogs";
 import { createMeeting, deleteMeeting, updateMeeting, type MeetingInput } from "@/app/dashboard/actions";
 
 export type MeetingT = {
@@ -157,7 +158,14 @@ export function Meetings({
                   {(canManage || m.createdById === userId) && (
                     <button
                       className="link-danger"
-                      onClick={() => confirm(`Excluir a reunião "${m.title}"?`) && start(() => deleteMeeting(m.id))}
+                      onClick={async () => {
+                        const ok = await dialog.confirm({
+                          title: "Excluir reunião",
+                          message: `A reunião "${m.title}" será excluída.`,
+                          danger: true,
+                        });
+                        if (ok) start(() => deleteMeeting(m.id));
+                      }}
                     >
                       Excluir
                     </button>

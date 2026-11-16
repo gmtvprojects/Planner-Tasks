@@ -1,6 +1,7 @@
 "use client";
 
 import { useTransition } from "react";
+import { dialog } from "@/app/dialogs";
 import { deleteProject, renameProject } from "@/app/dashboard/actions";
 
 export function ProjectActions({ id, name }: { id: string; name: string }) {
@@ -10,8 +11,12 @@ export function ProjectActions({ id, name }: { id: string; name: string }) {
       <button
         disabled={pending}
         className="link"
-        onClick={() => {
-          const n = prompt("Novo nome do projeto", name)?.trim();
+        onClick={async () => {
+          const n = await dialog.prompt({
+            title: "Renomear projeto",
+            defaultValue: name,
+            confirmLabel: "Salvar",
+          });
           if (n && n !== name) start(() => renameProject(id, n));
         }}
       >
@@ -20,10 +25,13 @@ export function ProjectActions({ id, name }: { id: string; name: string }) {
       <button
         disabled={pending}
         className="link-danger"
-        onClick={() => {
-          if (confirm(`Excluir o projeto "${name}" com quadro, reuniões e associações?`)) {
-            start(() => deleteProject(id));
-          }
+        onClick={async () => {
+          const ok = await dialog.confirm({
+            title: "Excluir projeto",
+            message: `"${name}" será excluído com quadro, reuniões e associações. Esta ação não pode ser desfeita.`,
+            danger: true,
+          });
+          if (ok) start(() => deleteProject(id));
         }}
       >
         Excluir

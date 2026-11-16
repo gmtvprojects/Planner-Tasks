@@ -101,21 +101,11 @@ export async function ReunioesTab({
   );
 }
 
-export async function ProjetosTab({ userId }: { userId: string }) {
-  const [projects, users] = await Promise.all([
-    prisma.project.findMany({
-      orderBy: { name: "asc" },
-      include: {
-        columns: { select: { id: true } },
-        members: {
-          include: { user: { select: { name: true, email: true } } },
-          orderBy: { user: { name: "asc" } },
-        },
-      },
-    }),
-    prisma.user.findMany({ select: { email: true }, orderBy: { email: "asc" } }),
-  ]);
-  const emails = users.map((u) => u.email);
+export async function ProjetosTab() {
+  const projects = await prisma.project.findMany({
+    orderBy: { name: "asc" },
+    include: { _count: { select: { columns: true } } },
+  });
 
   return (
     <div className="mx-auto w-full max-w-3xl">
@@ -128,34 +118,16 @@ export async function ProjetosTab({ userId }: { userId: string }) {
       </section>
 
       <section className="mt-8">
-        <h2 className="mb-3 text-lg font-extrabold">Projetos e membros associados</h2>
+        <h2 className="mb-3 text-lg font-extrabold">Projetos</h2>
         {projects.length === 0 && <p className="text-muted">Nenhum projeto criado ainda.</p>}
-        <ul className="flex flex-col gap-4">
+        <ul className="flex flex-col gap-3">
           {projects.map((p) => (
-            <li key={p.id} className="panel p-4">
-              <div className="flex items-start justify-between gap-2">
-                <div>
-                  <h3 className="text-lg font-bold">{p.name}</h3>
-                  <p className="text-sm text-muted">
-                    {p.columns.length} abas · {p.members.length} membros
-                  </p>
-                </div>
-                <ProjectActions id={p.id} name={p.name} />
+            <li key={p.id} className="panel flex items-center justify-between gap-2 p-4">
+              <div>
+                <h3 className="text-lg font-bold">{p.name}</h3>
+                <p className="text-sm text-muted">{p._count.columns} abas</p>
               </div>
-              <div className="mt-3">
-                <MembersList
-                  projectId={p.id}
-                  canManage
-                  currentUserId={userId}
-                  members={p.members.map((m) => ({
-                    userId: m.userId,
-                    name: m.user.name,
-                    email: m.user.email,
-                    role: m.role,
-                  }))}
-                />
-                <AddMember projectId={p.id} suggestions={emails} />
-              </div>
+              <ProjectActions id={p.id} name={p.name} />
             </li>
           ))}
         </ul>
