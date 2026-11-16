@@ -10,9 +10,9 @@ const client = new pg.Client({ connectionString: process.env.DATABASE_URL });
 await client.connect();
 const hash = await bcrypt.hash(password, 12);
 await client.query(
-  `insert into "User" (id, email, name, "passwordHash")
-   values ($1, $2, $3, $4)
-   on conflict (email) do update set "passwordHash" = excluded."passwordHash"`,
+  `insert into "User" (id, email, name, "passwordHash", "isAdmin")
+   values ($1, $2, $3, $4, true)
+   on conflict (email) do update set "passwordHash" = excluded."passwordHash", "isAdmin" = true`,
   ["seed-dev-user", email, "Dev", hash],
 );
 await client.end();

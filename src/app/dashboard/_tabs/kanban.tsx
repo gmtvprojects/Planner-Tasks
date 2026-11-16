@@ -30,7 +30,7 @@ import {
   moveColumn,
   renameColumn,
   updateCard,
-} from "@/app/boards/actions";
+} from "@/app/dashboard/actions";
 
 type CardT = { id: string; title: string; description: string | null; position: number };
 type ColumnT = { id: string; title: string; position: number; cards: CardT[] };
@@ -59,7 +59,7 @@ async function persist<T>(p: Promise<T>) {
   }
 }
 
-export function Kanban({ boardId, initial }: { boardId: string; initial: ColumnT[] }) {
+export function Kanban({ projectId, initial }: { projectId: string; initial: ColumnT[] }) {
   const [columns, setColumns] = useState<ColumnT[]>(initial);
   const [active, setActive] = useState<string | null>(null);
   const [editing, setEditing] = useState<CardT | null>(null);
@@ -159,7 +159,7 @@ export function Kanban({ boardId, initial }: { boardId: string; initial: ColumnT
     const name = newCol.trim();
     if (!name) return;
     setNewCol("");
-    const c = await persist(createColumn(boardId, name));
+    const c = await persist(createColumn(projectId, name));
     setColumns((cs) => [...cs, { ...c, cards: [] }]);
   }
 

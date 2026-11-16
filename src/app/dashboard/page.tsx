@@ -1,60 +1,86 @@
 import Link from "next/link";
 import { logout } from "@/app/actions";
-import { createBoard } from "@/app/boards/actions";
-import { requireUser } from "@/lib/dal";
+import { getProjectAccess, requireUser } from "@/lib/dal";
 import { prisma } from "@/lib/db";
-import { BoardCardActions } from "./board-actions";
+import { ProjectSelect } from "./project-select";
+import { MembrosTab, ProjetosTab, QuadroTab, ReunioesTab } from "./_tabs/tabs";
 
-export default async function Page() {
+const LABELS = {
+  quadro: "Quadro",
+  membros: "Membros",
+  reunioes: "Reuniões",
+  projetos: "Projetos",
+} as const;
+type Tab = keyof typeof LABELS;
+
+export default async function Page({
+  searchParams,
+}: {
+  searchParams: Promise<{ tab?: string; p?: string }>;
+}) {
   const user = await requireUser();
-  const memberships = await prisma.boardMember.findMany({
-    where: { userId: user.id },
-    include: { board: { include: { _count: { select: { columns: true } } } } },
-    orderBy: { board: { createdAt: "desc" } },
+  const sp = await searchParams;
+
+  const projects = await prisma.project.findMany({
+    where: user.isAdmin ? {} : { members: { some: { userId: user.id } } },
+    orderBy: { name: "asc" },
+    select: { id: true, name: true },
   });
+  const project = projects.find((p) => p.id === sp.p) ?? projects[0];
+
+  // Sem projetos (e sem ser admin) a tela aparece sem abas e sem projetos.
+  const tabs: Tab[] = [
+    ...(project ? (["quadro", "membros", "reunioes"] as const) : []),
+    ...(user.isAdmin ? (["projetos"] as const) : []),
+  ];
+  const tab = tabs.find((t) => t === sp.tab) ?? tabs[0];
+  const access = project ? await getProjectAccess(project.id) : null;
+  const href = (t: Tab) => `/dashboard?tab=${t}${project ? `&p=${project.id}` : ""}`;
 
   return (
-    <main className="mx-auto max-w-3xl p-6">
-      <header className="flex items-start justify-between">
+    <main className="mx-auto flex h-screen w-full max-w-[1400px] flex-col p-4 sm:p-6">
+      <header className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <p className="eyebrow">Planner <span className="text-muted">| Tasks</span></p>
-          <h1 className="mt-1 text-3xl font-black">
+          <p className="eyebrow">
+            Planner <span className="text-muted">| Tasks</span>
+          </p>
+          <h1 className="mt-1 text-2xl font-black">
             Olá, <span className="text-brand">{user.name}</span>
           </h1>
         </div>
-        <form action={logout}><button className="link text-sm">Sair</button></form>
+        <div className="flex items-center gap-4">
+          {project && tab && <ProjectSelect projects={projects} current={project.id} tab={tab} />}
+          <form action={logout}>
+            <button className="link text-sm">Sair</button>
+          </form>
+        </div>
       </header>
 
-      <section className="mt-10">
-        <h2 className="mb-3 text-lg font-extrabold">Novo quadro</h2>
-        <form action={createBoard} className="flex flex-col gap-2 sm:flex-row">
-          <input name="name" required placeholder="Nome do quadro" className="field flex-1" />
-          <input
-            name="columns"
-            placeholder="Abas separadas por vírgula (padrão: A fazer, Em andamento, Concluído)"
-            className="field flex-[2]"
-          />
-          <button className="btn-primary">Criar</button>
-        </form>
-      </section>
-
-      <section className="mt-10">
-        <h2 className="mb-3 text-lg font-extrabold">Seus quadros</h2>
-        {memberships.length === 0 && <p className="text-muted">Nenhum quadro ainda.</p>}
-        <ul className="grid gap-3 sm:grid-cols-2">
-          {memberships.map(({ board, role }) => (
-            <li key={board.id} className="panel relative p-4 transition hover:border-brand">
-              <Link
-                href={`/boards/${board.id}`}
-                className="text-lg font-bold after:absolute after:inset-0 after:content-[''] hover:text-brand"
-              >
-                {board.name}
-              </Link>
-              <p className="text-sm text-muted">{board._count.columns} abas</p>
-              <BoardCardActions id={board.id} name={board.name} isOwner={role === "OWNER"} />
-            </li>
+      {tabs.length > 0 && (
+        <nav className="mt-6 flex gap-1 overflow-x-auto border-b border-line">
+          {tabs.map((t) => (
+            <Link
+              key={t}
+              href={href(t)}
+              className={`-mb-px border-b-2 px-4 py-2 text-sm font-bold whitespace-nowrap transition ${
+                t === tab ? "border-brand text-brand" : "border-transparent text-muted hover:text-fg"
+              }`}
+            >
+              {LABELS[t]}
+            </Link>
           ))}
-        </ul>
+        </nav>
+      )}
+
+      <section className="mt-6 flex min-h-0 flex-1 flex-col overflow-y-auto">
+        {tab === "quadro" && project && <QuadroTab projectId={project.id} />}
+        {tab === "membros" && project && access && (
+          <MembrosTab projectId={project.id} canManage={access.canManage} userId={user.id} />
+        )}
+        {tab === "reunioes" && project && access && (
+          <ReunioesTab projectId={project.id} canManage={access.canManage} userId={user.id} />
+        )}
+        {tab === "projetos" && user.isAdmin && <ProjetosTab userId={user.id} />}
       </section>
     </main>
   );
