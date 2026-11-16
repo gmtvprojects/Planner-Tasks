@@ -33,6 +33,23 @@ body {
   font-family: var(--font-montserrat), Arial, Helvetica, sans-serif;
 }
 
+/* Barras de rolagem discretas, no tema escuro */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--line) transparent;
+}
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--line);
+  border-radius: 8px;
+}
+*::-webkit-scrollbar-button {
+  display: none;
+}
+
 @layer components {
   .field {
     @apply w-full rounded-md border border-line bg-surface-2 px-3 py-2 text-fg placeholder:text-muted focus:border-brand focus:outline-none;

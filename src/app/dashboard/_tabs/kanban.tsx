@@ -24,15 +24,13 @@ import { CSS } from "@dnd-kit/utilities";
 import {
   createCard,
   createColumn,
-  deleteCard,
   deleteColumn,
   moveCard,
   moveColumn,
   renameColumn,
-  updateCard,
 } from "@/app/dashboard/actions";
+import { Avatar, CardModal, LabelChip, type CardT } from "./card-modal";
 
-type CardT = { id: string; title: string; description: string | null; position: number };
 type ColumnT = { id: string; title: string; position: number; cards: CardT[] };
 
 const colId = (id: string) => `col:${id}`;
@@ -59,10 +57,19 @@ async function persist<T>(p: Promise<T>) {
   }
 }
 
-export function Kanban({ projectId, initial }: { projectId: string; initial: ColumnT[] }) {
+export function Kanban({
+  projectId,
+  projectName,
+  initial,
+}: {
+  projectId: string;
+  projectName: string;
+  initial: ColumnT[];
+}) {
   const [columns, setColumns] = useState<ColumnT[]>(initial);
   const [active, setActive] = useState<string | null>(null);
-  const [editing, setEditing] = useState<CardT | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const editing = editingId ? columns.flatMap((c) => c.cards).find((k) => k.id === editingId) ?? null : null;
   const [newCol, setNewCol] = useState("");
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
@@ -165,7 +172,8 @@ export function Kanban({ projectId, initial }: { projectId: string; initial: Col
 
   async function addCard(columnId: string, name: string) {
     const card = await persist(createCard(columnId, name));
-    setColumns((cs) => cs.map((c) => (c.id === columnId ? { ...c, cards: [...c.cards, card] } : c)));
+    const full: CardT = { ...card, labels: [], assignees: [] };
+    setColumns((cs) => cs.map((c) => (c.id === columnId ? { ...c, cards: [...c.cards, full] } : c)));
   }
 
   async function renameCol(c: ColumnT) {
@@ -184,21 +192,13 @@ export function Kanban({ projectId, initial }: { projectId: string; initial: Col
     await persist(deleteColumn(c.id));
   }
 
-  async function saveCard(card: CardT, title: string, description: string) {
-    setEditing(null);
-    setColumns((cs) =>
-      cs.map((c) => ({
-        ...c,
-        cards: c.cards.map((k) => (k.id === card.id ? { ...k, title, description: description || null } : k)),
-      })),
-    );
-    await persist(updateCard(card.id, { title, description }));
+  function patchCard(id: string, patch: Partial<CardT>) {
+    setColumns((cs) => cs.map((c) => ({ ...c, cards: c.cards.map((k) => (k.id === id ? { ...k, ...patch } : k)) })));
   }
 
-  async function removeCard(card: CardT) {
-    setEditing(null);
-    setColumns((cs) => cs.map((c) => ({ ...c, cards: c.cards.filter((k) => k.id !== card.id) })));
-    await persist(deleteCard(card.id));
+  function dropCard(id: string) {
+    setEditingId(null);
+    setColumns((cs) => cs.map((c) => ({ ...c, cards: c.cards.filter((k) => k.id !== id) })));
   }
 
   const activeCard = active?.startsWith("card:")
@@ -226,7 +226,8 @@ export function Kanban({ projectId, initial }: { projectId: string; initial: Col
                 onRename={() => renameCol(c)}
                 onDelete={() => removeCol(c)}
                 onAddCard={(t) => addCard(c.id, t)}
-                onEditCard={setEditing}
+                projectName={projectName}
+                onEditCard={(k) => setEditingId(k.id)}
               />
             ))}
           </SortableContext>
@@ -248,7 +249,7 @@ export function Kanban({ projectId, initial }: { projectId: string; initial: Col
         </div>
 
         <DragOverlay>
-          {activeCard && <CardView card={activeCard} />}
+          {activeCard && <CardView card={activeCard} projectName={projectName} />}
           {activeColumn && (
             <div className="panel w-72 border-brand p-3 font-bold opacity-90">
               {activeColumn.title}
@@ -261,9 +262,11 @@ export function Kanban({ projectId, initial }: { projectId: string; initial: Col
         <CardModal
           key={editing.id}
           card={editing}
-          onClose={() => setEditing(null)}
-          onSave={saveCard}
-          onDelete={removeCard}
+          projectName={projectName}
+          onClose={() => setEditingId(null)}
+          onChange={(patch) => patchCard(editing.id, patch)}
+          onMovedOut={() => dropCard(editing.id)}
+          onDeleted={() => dropCard(editing.id)}
         />
       )}
     </>
@@ -276,12 +279,14 @@ function Column({
   onDelete,
   onAddCard,
   onEditCard,
+  projectName,
 }: {
   column: ColumnT;
   onRename: () => void;
   onDelete: () => void;
   onAddCard: (title: string) => void;
   onEditCard: (c: CardT) => void;
+  projectName: string;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: colId(column.id),
@@ -305,7 +310,7 @@ function Column({
       <SortableContext items={column.cards.map((k) => cardId(k.id))} strategy={verticalListSortingStrategy}>
         <div className="flex min-h-8 flex-col gap-2 overflow-y-auto">
           {column.cards.map((k) => (
-            <SortableCard key={k.id} card={k} onClick={() => onEditCard(k)} />
+            <SortableCard key={k.id} card={k} projectName={projectName} onClick={() => onEditCard(k)} />
           ))}
         </div>
       </SortableContext>
@@ -331,16 +336,38 @@ function Column({
   );
 }
 
-function CardView({ card }: { card: CardT }) {
+function CardView({ card, projectName }: { card: CardT; projectName: string }) {
   return (
     <div className="rounded-md border border-line bg-surface-2 p-2 text-sm text-fg transition hover:border-brand">
-      <p>{card.title}</p>
-      {card.description && <p className="mt-1 line-clamp-2 text-xs text-muted">{card.description}</p>}
+      <div className="mb-1.5 flex flex-wrap gap-1">
+        <span className="inline-block rounded border border-brand px-2 py-0.5 text-xs font-bold text-brand">
+          {projectName}
+        </span>
+        {card.labels.map((l) => (
+          <LabelChip key={l.id} label={l} />
+        ))}
+      </div>
+      <p className="font-medium">{card.title}</p>
+      {card.assignees.length > 0 && (
+        <div className="mt-2 flex -space-x-1">
+          {card.assignees.map((a) => (
+            <Avatar key={a.id} name={a.name} />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
 
-function SortableCard({ card, onClick }: { card: CardT; onClick: () => void }) {
+function SortableCard({
+  card,
+  projectName,
+  onClick,
+}: {
+  card: CardT;
+  projectName: string;
+  onClick: () => void;
+}) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: cardId(card.id),
   });
@@ -353,58 +380,7 @@ function SortableCard({ card, onClick }: { card: CardT; onClick: () => void }) {
       {...attributes}
       {...listeners}
     >
-      <CardView card={card} />
-    </div>
-  );
-}
-
-function CardModal({
-  card,
-  onClose,
-  onSave,
-  onDelete,
-}: {
-  card: CardT;
-  onClose: () => void;
-  onSave: (card: CardT, title: string, description: string) => void;
-  onDelete: (card: CardT) => void;
-}) {
-  const [title, setTitle] = useState(card.title);
-  const [description, setDescription] = useState(card.description ?? "");
-  const field = "field";
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={onClose}>
-      <form
-        onClick={(e) => e.stopPropagation()}
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (title.trim()) onSave(card, title.trim(), description);
-        }}
-        className="flex w-full max-w-md flex-col gap-3 panel p-4"
-      >
-        <input value={title} onChange={(e) => setTitle(e.target.value)} className={field} autoFocus />
-        <textarea
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          rows={5}
-          placeholder="Descrição"
-          className={field}
-        />
-        <div className="flex justify-between">
-          <button
-            type="button"
-            className="link-danger"
-            onClick={() => confirm("Excluir este cartão?") && onDelete(card)}
-          >
-            Excluir
-          </button>
-          <div className="flex gap-3">
-            <button type="button" onClick={onClose} className="link">Cancelar</button>
-            <button className="btn-primary py-1">Salvar</button>
-          </div>
-        </div>
-      </form>
+      <CardView card={card} projectName={projectName} />
     </div>
   );
 }

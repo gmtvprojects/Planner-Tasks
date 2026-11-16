@@ -14,14 +14,21 @@ async function loadMembers(projectId: string): Promise<MemberT[]> {
   return rows.map((r) => ({ userId: r.userId, name: r.user.name, email: r.user.email, role: r.role }));
 }
 
-export async function QuadroTab({ projectId }: { projectId: string }) {
+export async function QuadroTab({ projectId, projectName }: { projectId: string; projectName: string }) {
   const columns = await prisma.column.findMany({
     where: { projectId },
     orderBy: { position: "asc" },
     include: {
       cards: {
         orderBy: { position: "asc" },
-        select: { id: true, title: true, description: true, position: true },
+        select: {
+          id: true,
+          title: true,
+          description: true,
+          position: true,
+          labels: { select: { id: true, name: true, color: true }, orderBy: { name: "asc" } },
+          assignees: { select: { id: true, name: true }, orderBy: { name: "asc" } },
+        },
       },
     },
   });
@@ -29,6 +36,7 @@ export async function QuadroTab({ projectId }: { projectId: string }) {
     <Kanban
       key={projectId}
       projectId={projectId}
+      projectName={projectName}
       initial={columns.map((c) => ({ id: c.id, title: c.title, position: c.position, cards: c.cards }))}
     />
   );

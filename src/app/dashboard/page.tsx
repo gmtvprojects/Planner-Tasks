@@ -57,7 +57,7 @@ export default async function Page({
       </header>
 
       {tabs.length > 0 && (
-        <nav className="mt-6 flex gap-1 overflow-x-auto border-b border-line">
+        <nav className="mt-6 flex shrink-0 gap-1 overflow-x-auto overflow-y-hidden border-b border-line">
           {tabs.map((t) => (
             <Link
               key={t}
@@ -73,7 +73,7 @@ export default async function Page({
       )}
 
       <section className="mt-6 flex min-h-0 flex-1 flex-col overflow-y-auto">
-        {tab === "quadro" && project && <QuadroTab projectId={project.id} />}
+        {tab === "quadro" && project && <QuadroTab projectId={project.id} projectName={project.name} />}
         {tab === "membros" && project && access && (
           <MembrosTab projectId={project.id} canManage={access.canManage} userId={user.id} />
         )}
