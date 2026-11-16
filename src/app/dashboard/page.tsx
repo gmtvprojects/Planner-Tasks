@@ -49,7 +49,10 @@ export default async function Page({
           </h1>
         </div>
         <div className="flex items-center gap-4">
-          {project && tab && <ProjectSelect projects={projects} current={project.id} tab={tab} />}
+          {/* No Quadro o seletor de projeto fica na barra de filtros */}
+          {project && tab && tab !== "quadro" && (
+            <ProjectSelect projects={projects} current={project.id} tab={tab} />
+          )}
           <form action={logout}>
             <button className="link text-sm">Sair</button>
           </form>
@@ -73,7 +76,7 @@ export default async function Page({
       )}
 
       <section className="mt-6 flex min-h-0 flex-1 flex-col overflow-y-auto">
-        {tab === "quadro" && project && <QuadroTab projectId={project.id} projectName={project.name} />}
+        {tab === "quadro" && project && <QuadroTab projects={projects} />}
         {tab === "membros" && project && access && (
           <MembrosTab projectId={project.id} canManage={access.canManage} userId={user.id} />
         )}

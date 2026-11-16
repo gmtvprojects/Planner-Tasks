@@ -218,22 +218,44 @@ export async function updateCard(cardId: string, data: { title: string; descript
   });
 }
 
-export async function moveCard(cardId: string, columnId: string, position: number) {
+const sameTitle = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
+
+/**
+ * Move o cartão para a aba de nome `targetTitle` dentro do projeto do próprio cartão.
+ * No quadro com vários projetos as abas são agrupadas pelo nome; se o projeto do cartão
+ * ainda não tem essa aba, ela é criada ao final.
+ */
+export async function moveCardToStatus(cardId: string, targetTitle: string, position: number) {
   const current = await prisma.card.findUniqueOrThrow({
     where: { id: cardId },
     select: { columnId: true, column: { select: { title: true, projectId: true } } },
   });
-  const { user } = await requireProjectAccess(current.column.projectId);
-  const target = await prisma.column.findUniqueOrThrow({
-    where: { id: columnId },
-    select: { title: true, projectId: true },
+  const projectId = current.column.projectId;
+  const { user } = await requireProjectAccess(projectId);
+
+  const siblings = await prisma.column.findMany({
+    where: { projectId },
+    orderBy: { position: "asc" },
+    select: { id: true, title: true, position: true },
   });
-  if (target.projectId !== current.column.projectId) throw new Error("Aba de outro projeto");
+  let target = siblings.find((c) => sameTitle(c.title, targetTitle));
+  let created = false;
+  if (!target) {
+    target = await prisma.column.create({
+      data: {
+        projectId,
+        title: title.parse(targetTitle),
+        position: (siblings.at(-1)?.position ?? 0) + GAP,
+      },
+      select: { id: true, title: true, position: true },
+    });
+    created = true;
+  }
 
   await prisma.$transaction([
-    prisma.card.update({ where: { id: cardId }, data: { columnId, position } }),
+    prisma.card.update({ where: { id: cardId }, data: { columnId: target.id, position } }),
     // Só registra no histórico quando muda de aba (reordenar na mesma aba não conta).
-    ...(current.columnId !== columnId
+    ...(current.columnId !== target.id
       ? [
           prisma.cardEvent.create({
             data: { cardId, fromTitle: current.column.title, toTitle: target.title, userId: user.id },
@@ -241,6 +263,10 @@ export async function moveCard(cardId: string, columnId: string, position: numbe
         ]
       : []),
   ]);
+  return {
+    columnId: target.id,
+    column: created ? { id: target.id, projectId, title: target.title, position: target.position } : null,
+  };
 }
 
 export async function deleteCard(cardId: string) {

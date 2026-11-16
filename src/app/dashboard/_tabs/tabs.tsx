@@ -14,31 +14,62 @@ async function loadMembers(projectId: string): Promise<MemberT[]> {
   return rows.map((r) => ({ userId: r.userId, name: r.user.name, email: r.user.email, role: r.role }));
 }
 
-export async function QuadroTab({ projectId, projectName }: { projectId: string; projectName: string }) {
-  const columns = await prisma.column.findMany({
-    where: { projectId },
-    orderBy: { position: "asc" },
-    include: {
-      cards: {
-        where: { title: { not: "" } }, // rascunhos (sem título) não aparecem
-        orderBy: { position: "asc" },
-        select: {
-          id: true,
-          title: true,
-          description: true,
-          position: true,
-          labels: { select: { id: true, name: true, color: true }, orderBy: { name: "asc" } },
-          assignees: { select: { id: true, name: true }, orderBy: { name: "asc" } },
+export async function QuadroTab({ projects }: { projects: { id: string; name: string }[] }) {
+  const ids = projects.map((p) => p.id);
+  const projectName = new Map(projects.map((p) => [p.id, p.name]));
+
+  const [columns, memberships, labels] = await Promise.all([
+    prisma.column.findMany({
+      where: { projectId: { in: ids } },
+      orderBy: { position: "asc" },
+      include: {
+        cards: {
+          where: { title: { not: "" } }, // rascunhos (sem título) não aparecem
+          orderBy: { position: "asc" },
+          select: {
+            id: true,
+            title: true,
+            description: true,
+            position: true,
+            labels: { select: { id: true, name: true, color: true }, orderBy: { name: "asc" } },
+            assignees: { select: { id: true, name: true }, orderBy: { name: "asc" } },
+          },
         },
       },
-    },
-  });
+    }),
+    prisma.projectMember.findMany({
+      where: { projectId: { in: ids } },
+      include: { user: { select: { id: true, name: true } } },
+      orderBy: { user: { name: "asc" } },
+    }),
+    prisma.label.findMany({
+      where: { projectId: { in: ids } },
+      orderBy: { name: "asc" },
+      select: { id: true, name: true, color: true, projectId: true },
+    }),
+  ]);
+
+  const members = new Map<string, { id: string; name: string; projectIds: string[] }>();
+  for (const m of memberships) {
+    const e = members.get(m.userId) ?? { id: m.user.id, name: m.user.name, projectIds: [] };
+    e.projectIds.push(m.projectId);
+    members.set(m.userId, e);
+  }
+
   return (
     <Kanban
-      key={projectId}
-      projectId={projectId}
-      projectName={projectName}
-      initial={columns.map((c) => ({ id: c.id, title: c.title, position: c.position, cards: c.cards }))}
+      projects={projects}
+      columns={columns.map((c) => ({ id: c.id, projectId: c.projectId, title: c.title, position: c.position }))}
+      cards={columns.flatMap((c) =>
+        c.cards.map((k) => ({
+          ...k,
+          columnId: c.id,
+          projectId: c.projectId,
+          projectName: projectName.get(c.projectId) ?? "",
+        })),
+      )}
+      members={[...members.values()]}
+      labels={labels}
     />
   );
 }

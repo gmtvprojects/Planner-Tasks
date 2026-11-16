@@ -27,6 +27,11 @@ export type CardT = {
   position: number;
   labels: LabelT[];
   assignees: AssigneeT[];
+  columnId: string;
+  projectId: string;
+  projectName: string;
+  /** Provisório durante o arrastar: nome (normalizado) da aba de destino. */
+  statusKey?: string;
 };
 
 export const LABEL_COLORS = ["#8fff00", "#ffd93d", "#ff9f43", "#ff6b6b", "#ff8ad8", "#b69cff", "#6cb6ff", "#4fe3c1"];

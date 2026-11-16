@@ -132,7 +132,7 @@ export async function setCardAssignees(cardId: string, userIds: string[]) {
 
 // ---------- Projeto ----------
 
-/** Move o cartão para a primeira aba de outro projeto; etiquetas e responsáveis inválidos são removidos. */
+/** Move o cartão para outro projeto (aba de mesmo nome, ou a primeira); etiquetas e responsáveis inválidos são removidos. */
 export async function moveCardToProject(cardId: string, targetProjectId: string) {
   const { projectId, user } = await cardCtx(cardId);
   if (projectId === targetProjectId) return;
@@ -146,11 +146,16 @@ export async function moveCardToProject(cardId: string, targetProjectId: string)
     where: { id: targetProjectId },
     select: { name: true },
   });
-  let column = await prisma.column.findFirst({
+  // Prefere a aba de mesmo nome no projeto de destino; senão, a primeira aba.
+  const targetColumns = await prisma.column.findMany({
     where: { projectId: targetProjectId },
     orderBy: { position: "asc" },
     select: { id: true, title: true },
   });
+  let column =
+    targetColumns.find((c) => c.title.trim().toLowerCase() === from.column.title.trim().toLowerCase()) ??
+    targetColumns[0] ??
+    null;
   if (!column) {
     column = await prisma.column.create({
       data: { projectId: targetProjectId, title: "A fazer", position: GAP },
