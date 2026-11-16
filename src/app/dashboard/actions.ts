@@ -184,17 +184,30 @@ export async function deleteColumn(columnId: string) {
 
 // ---------- Cartões ----------
 
-export async function createCard(columnId: string, name: string) {
-  await requireProjectAccess(await projectIdOfColumn(columnId));
-  const last = await prisma.card.findFirst({
-    where: { columnId },
-    orderBy: { position: "desc" },
-    select: { position: true },
+/**
+ * Cria o cartão já no banco, com título vazio (rascunho invisível no quadro), para que etiquetas,
+ * checklist, responsáveis e comentários possam ser preenchidos antes de confirmar. O título
+ * passa a ser obrigatório ao confirmar; rascunhos sem título são descartados.
+ */
+export async function createDraftCard(columnId: string) {
+  const { user } = await requireProjectAccess(await projectIdOfColumn(columnId));
+  await prisma.card.deleteMany({
+    where: { title: "", createdAt: { lt: new Date(Date.now() - 24 * 60 * 60 * 1000) } },
   });
-  return prisma.card.create({
-    data: { columnId, title: title.parse(name), position: (last?.position ?? 0) + GAP },
-    select: { id: true, title: true, description: true, position: true },
+  const [column, last] = await Promise.all([
+    prisma.column.findUniqueOrThrow({ where: { id: columnId }, select: { title: true } }),
+    prisma.card.findFirst({ where: { columnId }, orderBy: { position: "desc" }, select: { position: true } }),
+  ]);
+  const card = await prisma.card.create({
+    data: {
+      columnId,
+      title: "",
+      position: (last?.position ?? 0) + GAP,
+      events: { create: { toTitle: column.title, userId: user.id } },
+    },
+    select: { id: true, title: true, description: true, position: true, createdAt: true },
   });
+  return { ...card, createdAt: card.createdAt.toISOString() };
 }
 
 export async function updateCard(cardId: string, data: { title: string; description: string }) {
@@ -206,10 +219,28 @@ export async function updateCard(cardId: string, data: { title: string; descript
 }
 
 export async function moveCard(cardId: string, columnId: string, position: number) {
-  const projectId = await projectIdOfCard(cardId);
-  await requireProjectAccess(projectId);
-  if ((await projectIdOfColumn(columnId)) !== projectId) throw new Error("Aba de outro projeto");
-  await prisma.card.update({ where: { id: cardId }, data: { columnId, position } });
+  const current = await prisma.card.findUniqueOrThrow({
+    where: { id: cardId },
+    select: { columnId: true, column: { select: { title: true, projectId: true } } },
+  });
+  const { user } = await requireProjectAccess(current.column.projectId);
+  const target = await prisma.column.findUniqueOrThrow({
+    where: { id: columnId },
+    select: { title: true, projectId: true },
+  });
+  if (target.projectId !== current.column.projectId) throw new Error("Aba de outro projeto");
+
+  await prisma.$transaction([
+    prisma.card.update({ where: { id: cardId }, data: { columnId, position } }),
+    // Só registra no histórico quando muda de aba (reordenar na mesma aba não conta).
+    ...(current.columnId !== columnId
+      ? [
+          prisma.cardEvent.create({
+            data: { cardId, fromTitle: current.column.title, toTitle: target.title, userId: user.id },
+          }),
+        ]
+      : []),
+  ]);
 }
 
 export async function deleteCard(cardId: string) {

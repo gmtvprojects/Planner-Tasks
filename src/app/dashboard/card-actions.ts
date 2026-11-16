@@ -25,6 +25,8 @@ export type CardDetail = {
   title: string;
   description: string;
   projectId: string;
+  createdAt: string;
+  events: { id: string; fromTitle: string | null; toTitle: string; userName: string | null; createdAt: string }[];
   labelIds: string[];
   assigneeIds: string[];
   checklist: { id: string; text: string; done: boolean }[];
@@ -46,6 +48,7 @@ export async function getCardDetail(cardId: string): Promise<CardDetail> {
         assignees: { select: { id: true } },
         checklist: { orderBy: { position: "asc" } },
         comments: { orderBy: { createdAt: "asc" }, include: { author: { select: { id: true, name: true } } } },
+        events: { orderBy: { createdAt: "desc" }, include: { user: { select: { name: true } } } },
       },
     }),
     prisma.label.findMany({ where: { projectId }, orderBy: { name: "asc" }, select: { id: true, name: true, color: true } }),
@@ -65,6 +68,14 @@ export async function getCardDetail(cardId: string): Promise<CardDetail> {
     title: card.title,
     description: card.description ?? "",
     projectId,
+    createdAt: card.createdAt.toISOString(),
+    events: card.events.map((e) => ({
+      id: e.id,
+      fromTitle: e.fromTitle,
+      toTitle: e.toTitle,
+      userName: e.user?.name ?? null,
+      createdAt: e.createdAt.toISOString(),
+    })),
     labelIds: card.labels.map((l) => l.id),
     assigneeIds: card.assignees.map((a) => a.id),
     checklist: card.checklist.map((i) => ({ id: i.id, text: i.text, done: i.done })),
@@ -123,19 +134,27 @@ export async function setCardAssignees(cardId: string, userIds: string[]) {
 
 /** Move o cartão para a primeira aba de outro projeto; etiquetas e responsáveis inválidos são removidos. */
 export async function moveCardToProject(cardId: string, targetProjectId: string) {
-  const { projectId } = await cardCtx(cardId);
+  const { projectId, user } = await cardCtx(cardId);
   if (projectId === targetProjectId) return;
   await requireProjectAccess(targetProjectId);
 
+  const from = await prisma.card.findUniqueOrThrow({
+    where: { id: cardId },
+    select: { column: { select: { title: true, project: { select: { name: true } } } } },
+  });
+  const targetProject = await prisma.project.findUniqueOrThrow({
+    where: { id: targetProjectId },
+    select: { name: true },
+  });
   let column = await prisma.column.findFirst({
     where: { projectId: targetProjectId },
     orderBy: { position: "asc" },
-    select: { id: true },
+    select: { id: true, title: true },
   });
   if (!column) {
     column = await prisma.column.create({
       data: { projectId: targetProjectId, title: "A fazer", position: GAP },
-      select: { id: true },
+      select: { id: true, title: true },
     });
   }
   const last = await prisma.card.findFirst({
@@ -159,6 +178,13 @@ export async function moveCardToProject(cardId: string, targetProjectId: string)
       position: (last?.position ?? 0) + GAP,
       labels: { set: [] },
       assignees: { set: current.assignees.filter((a) => keep.has(a.id)) },
+      events: {
+        create: {
+          fromTitle: `${from.column.project.name} › ${from.column.title}`,
+          toTitle: `${targetProject.name} › ${column.title}`,
+          userId: user.id,
+        },
+      },
     },
   });
 }

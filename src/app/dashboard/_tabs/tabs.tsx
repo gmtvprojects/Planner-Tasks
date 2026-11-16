@@ -20,6 +20,7 @@ export async function QuadroTab({ projectId, projectName }: { projectId: string;
     orderBy: { position: "asc" },
     include: {
       cards: {
+        where: { title: { not: "" } }, // rascunhos (sem título) não aparecem
         orderBy: { position: "asc" },
         select: {
           id: true,

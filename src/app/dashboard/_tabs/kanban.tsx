@@ -22,7 +22,7 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import {
-  createCard,
+  createDraftCard,
   createColumn,
   deleteColumn,
   moveCard,
@@ -70,6 +70,7 @@ export function Kanban({
   const [columns, setColumns] = useState<ColumnT[]>(initial);
   const [active, setActive] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [draft, setDraft] = useState<{ columnId: string; card: CardT } | null>(null);
   const editing = editingId ? columns.flatMap((c) => c.cards).find((k) => k.id === editingId) ?? null : null;
   const [newCol, setNewCol] = useState("");
 
@@ -171,10 +172,22 @@ export function Kanban({
     setColumns((cs) => [...cs, { ...c, cards: [] }]);
   }
 
-  async function addCard(columnId: string, name: string) {
-    const card = await persist(createCard(columnId, name));
-    const full: CardT = { ...card, labels: [], assignees: [] };
-    setColumns((cs) => cs.map((c) => (c.id === columnId ? { ...c, cards: [...c.cards, full] } : c)));
+  async function startCard(columnId: string) {
+    const c = await persist(createDraftCard(columnId));
+    setDraft({
+      columnId,
+      card: { id: c.id, title: c.title, description: c.description, position: c.position, labels: [], assignees: [] },
+    });
+  }
+
+  function finishDraft(needsReload: boolean) {
+    const d = draft;
+    setDraft(null);
+    if (!d) return;
+    if (needsReload) return window.location.reload();
+    setColumns((cs) =>
+      cs.map((c) => (c.id === d.columnId ? { ...c, cards: [...c.cards, d.card] } : c)),
+    );
   }
 
   async function renameCol(c: ColumnT) {
@@ -234,7 +247,7 @@ export function Kanban({
                 column={c}
                 onRename={() => renameCol(c)}
                 onDelete={() => removeCol(c)}
-                onAddCard={(t) => addCard(c.id, t)}
+                onAddCard={() => startCard(c.id)}
                 projectName={projectName}
                 onEditCard={(k) => setEditingId(k.id)}
               />
@@ -267,6 +280,21 @@ export function Kanban({
         </DragOverlay>
       </DndContext>
 
+      {draft && (
+        <CardModal
+          key={draft.card.id}
+          isNew
+          card={draft.card}
+          projectName={projectName}
+          onClose={() => setDraft(null)}
+          onChange={(patch) => setDraft((d) => d && { ...d, card: { ...d.card, ...patch } })}
+          onMovedOut={() => setDraft(null)}
+          onDeleted={() => setDraft(null)}
+          onCreate={finishDraft}
+          onDiscard={() => setDraft(null)}
+        />
+      )}
+
       {editing && (
         <CardModal
           key={editing.id}
@@ -293,7 +321,7 @@ function Column({
   column: ColumnT;
   onRename: () => void;
   onDelete: () => void;
-  onAddCard: (title: string) => void;
+  onAddCard: () => void;
   onEditCard: (c: CardT) => void;
   projectName: string;
 }) {
@@ -328,15 +356,7 @@ function Column({
           title="Adicionar cartão"
           aria-label="Adicionar cartão"
           className="flex size-8 items-center justify-center rounded-md border border-line text-lg font-bold leading-none text-muted transition hover:border-brand hover:bg-brand hover:text-brand-ink"
-          onClick={async () => {
-            const t = await dialog.prompt({
-              title: "Novo cartão",
-              message: `Aba: ${column.title}`,
-              placeholder: "Título do cartão",
-              confirmLabel: "Adicionar",
-            });
-            if (t) onAddCard(t);
-          }}
+          onClick={onAddCard}
         >
           +
         </button>

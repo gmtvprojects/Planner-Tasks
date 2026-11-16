@@ -24,6 +24,21 @@ model User {
   comments        Comment[]
   meetings        Meeting[]       @relation("MeetingAttendees")
   meetingsCreated Meeting[]       @relation("MeetingCreator")
+  cardEvents      CardEvent[]
+}
+
+/// Histórico de movimentação do cartão entre abas (títulos guardados como estavam na hora).
+model CardEvent {
+  id        String   @id @default(cuid())
+  cardId    String
+  fromTitle String?
+  toTitle   String
+  userId    String?
+  createdAt DateTime @default(now())
+  card      Card     @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([cardId, createdAt])
 }
 
 model Project {
@@ -86,6 +101,7 @@ model Card {
   labels      Label[]
   comments    Comment[]
   checklist   ChecklistItem[]
+  events      CardEvent[]
 
   @@index([columnId, position])
 }
